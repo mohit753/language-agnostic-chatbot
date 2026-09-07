@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LinguaDesk — Admin Ledger</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Noto+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --ink:#14161C; --surface:#1C1F29; --surface-alt:#232733; --border:#2C303C;
+    --brass:#C9A24B; --teal:#3E8E88; --text:#EDEAE3; --muted:#9A9FAE;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--ink); color:var(--text); font-family:'Noto Sans', sans-serif; padding:32px; }
+  h1{ font-family:'Fraunces', serif; font-size:26px; margin:0 0 4px; }
+  .sub{ color:var(--muted); font-size:13px; margin-bottom:24px; }
+
+  .gate{ max-width:360px; margin:80px auto; text-align:center; }
+  .gate input{ width:100%; padding:12px; margin:12px 0; border-radius:8px; border:1px solid var(--border); background:var(--surface-alt); color:var(--text); font-family:'JetBrains Mono', monospace; }
+  .gate button{ padding:10px 18px; border-radius:8px; border:none; background:var(--brass); color:#1a1710; font-weight:600; cursor:pointer; }
+
+  .wrap{ display:none; max-width:1100px; margin:0 auto; }
+  .cards{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+  .card .num{ font-family:'Fraunces', serif; font-size:28px; color:var(--brass); }
+  .card .label{ color:var(--muted); font-size:11.5px; letter-spacing:0.4px; font-family:'JetBrains Mono', monospace; text-transform:uppercase; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; }
+  .panel h3{ margin:0 0 12px; font-size:14px; color:var(--muted); font-weight:600; letter-spacing:0.3px; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{ text-align:left; color:var(--muted); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; padding:8px 10px; border-bottom:1px solid var(--border); }
+  td{ padding:10px; border-bottom:1px solid var(--border); }
+  tr:hover td{ background:var(--surface-alt); cursor:pointer; }
+  .tag{ font-family:'JetBrains Mono', monospace; font-size:11px; padding:2px 8px; border-radius:100px; border:1px solid var(--brass); color:var(--brass); }
+
+  .modal-bg{ display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; }
+  .modal{ background:var(--surface); border:1px solid var(--border); border-radius:14px; width:600px; max-height:70vh; overflow-y:auto; padding:20px; }
+  .modal .row{ margin-bottom:12px; }
+  .modal .role{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--brass); margin-bottom:2px; }
+  .close{ float:right; cursor:pointer; color:var(--muted); }
+</style>
+</head>
+<body>
+
+  <div class="gate" id="gate">
+    <h1>LinguaDesk</h1>
+    <div class="sub">Admin Ledger</div>
+    <input id="tokenInput" type="password" placeholder="Admin token" />
+    <br/>
+    <button onclick="login()">Enter</button>
+  </div>
+
+  <div class="wrap" id="wrap">
+    <h1>Admin Ledger</h1>
+    <div class="sub">Conversation analytics across every language and desk</div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="grid2">
+      <div class="panel"><h3>Messages by language</h3><canvas id="langChart" height="200"></canvas></div>
+      <div class="panel"><h3>Sessions by desk</h3><canvas id="domainChart" height="200"></canvas></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:24px;">
+      <h3>Messages over last 14 days</h3>
+      <canvas id="timeChart" height="90"></canvas>
+    </div>
+
+    <div class="panel">
+      <h3>Recent conversations</h3>
+      <table>
+        <thead><tr><th>Session</th><th>Desk</th><th>Last language</th><th>Messages</th><th>Last activity</th></tr></thead>
+        <tbody id="sessionsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <span class="close" onclick="closeModal()">✕ close</span>
+      <h3 id="modalTitle">Transcript</h3>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+<script>
+  let token = '';
+
+  function login(){
+    token = document.getElementById('tokenInput').value.trim();
+    if(!token) return;
+    fetch('/api/admin/stats', { headers:{ 'x-admin-token': token } })
+      .then(r => { if(!r.ok) throw new Error('bad token'); return r.json(); })
+      .then(data => {
+        document.getElementById('gate').style.display = 'none';
+        document.getElementById('wrap').style.display = 'block';
+        renderStats(data);
+        loadSessions();
+      })
+      .catch(() => alert('Invalid admin token'));
+  }
+
+  function renderStats(data){
+    const cards = document.getElementById('cards');
+    const topLang = data.byLanguage[0] ? data.byLanguage[0].language_name : '—';
+    cards.innerHTML = `
+      <div class="card"><div class="num">${data.totalSessions}</div><div class="label">Sessions</div></div>
+      <div class="card"><div class="num">${data.totalMessages}</div><div class="label">Messages</div></div>
+      <div class="card"><div class="num">${data.byLanguage.length}</div><div class="label">Languages seen</div></div>
+      <div class="card"><div class="num">${topLang}</div><div class="label">Top language</div></div>
+    `;
+
+    new Chart(document.getElementById('langChart'), {
+      type:'doughnut',
+      data:{
+        labels:data.byLanguage.map(l=>l.language_name),
+        datasets:[{ data:data.byLanguage.map(l=>l.count),
+          backgroundColor:['#C9A24B','#3E8E88','#8A6FD1','#D17A5A','#5AA6D1','#9AA5B1','#D1B85A','#6FB18A'] }]
+      },
+      options:{ plugins:{ legend:{ labels:{ color:'#EDEAE3' } } } }
+    });
+
+    new Chart(document.getElementById('domainChart'), {
+      type:'bar',
+      data:{
+        labels:data.byDomain.map(d=>d.domain),
+        datasets:[{ label:'Sessions', data:data.byDomain.map(d=>d.sessions), backgroundColor:'#C9A24B' },
+                  { label:'Messages', data:data.byDomain.map(d=>d.messages), backgroundColor:'#3E8E88' }]
+      },
+      options:{ scales:{ x:{ ticks:{color:'#9A9FAE'} }, y:{ ticks:{color:'#9A9FAE'} } }, plugins:{ legend:{ labels:{ color:'#EDEAE3' } } } }
+    });
+
+    new Chart(document.getElementById('timeChart'), {
+      type:'line',
+      data:{
+        labels:data.byDay.map(d=>d.day),
+        datasets:[{ label:'Messages', data:data.byDay.map(d=>d.count), borderColor:'#C9A24B', backgroundColor:'rgba(201,162,75,0.15)', fill:true, tension:0.3 }]
+      },
+      options:{ scales:{ x:{ ticks:{color:'#9A9FAE'} }, y:{ ticks:{color:'#9A9FAE'} } }, plugins:{ legend:{ labels:{ color:'#EDEAE3' } } } }
+    });
+  }
+
+  function loadSessions(){
+    fetch('/api/admin/sessions', { headers:{ 'x-admin-token': token } })
+      .then(r=>r.json())
+      .then(data=>{
+        const body = document.getElementById('sessionsBody');
+        body.innerHTML = data.sessions.map(s => `
+          <tr onclick="openSession('${s.session_id}')">
+            <td>${s.session_id.slice(0,8)}…</td>
+            <td><span class="tag">${s.domain}</span></td>
+            <td>${s.last_language || '—'}</td>
+            <td>${s.message_count}</td>
+            <td>${s.last_at}</td>
+          </tr>
+        `).join('');
+      });
+  }
+
+  function openSession(id){
+    fetch('/api/admin/sessions/' + id, { headers:{ 'x-admin-token': token } })
+      .then(r=>r.json())
+      .then(data=>{
+        document.getElementById('modalTitle').textContent = 'Transcript — ' + id.slice(0,8) + '…';
+        document.getElementById('modalBody').innerHTML = data.messages.map(m => `
+          <div class="row">
+            <div class="role">${m.role.toUpperCase()} · ${m.language_name || ''}</div>
+            <div>${m.content}</div>
+          </div>
+        `).join('');
+        document.getElementById('modalBg').style.display = 'flex';
+      });
+  }
+
+  function closeModal(){ document.getElementById('modalBg').style.display = 'none'; }
+</script>
+</body>
+</html>

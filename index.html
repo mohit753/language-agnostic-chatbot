@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LinguaDesk — one desk, every language</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14161C;
+    --surface:#1C1F29;
+    --surface-alt:#232733;
+    --border:#2C303C;
+    --brass:#C9A24B;
+    --brass-dim:#8A7130;
+    --teal:#3E8E88;
+    --text:#EDEAE3;
+    --muted:#9A9FAE;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, rgba(201,162,75,0.08), transparent 60%),
+      var(--ink);
+    color:var(--text);
+    font-family:'Noto Sans', sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 16px;
+  }
+  .app{
+    width:100%;
+    max-width:720px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,0.45);
+  }
+  header{
+    padding:28px 28px 20px;
+    border-bottom:1px solid var(--border);
+    background:
+      repeating-linear-gradient(135deg, rgba(201,162,75,0.04) 0 2px, transparent 2px 14px);
+  }
+  header h1{
+    font-family:'Fraunces', serif;
+    font-weight:700;
+    font-size:28px;
+    margin:0 0 4px;
+    letter-spacing:0.2px;
+  }
+  header p{
+    margin:0;
+    color:var(--muted);
+    font-size:13.5px;
+    letter-spacing:0.3px;
+  }
+  .desks{
+    display:flex;
+    gap:8px;
+    padding:16px 28px 0;
+  }
+  .desk-btn{
+    flex:1;
+    padding:10px 12px;
+    border-radius:10px;
+    border:1px solid var(--border);
+    background:var(--surface-alt);
+    color:var(--muted);
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:0.4px;
+    cursor:pointer;
+    transition:all .15s ease;
+    text-align:center;
+  }
+  .desk-btn.active{
+    border-color:var(--brass);
+    color:var(--brass);
+    background:rgba(201,162,75,0.08);
+  }
+  .desk-btn:hover{ color:var(--text); }
+
+  .chat{
+    height:440px;
+    overflow-y:auto;
+    padding:24px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .row{ display:flex; }
+  .row.user{ justify-content:flex-end; }
+  .bubble{
+    position:relative;
+    max-width:78%;
+    padding:12px 16px;
+    border-radius:14px;
+    font-size:14.5px;
+    line-height:1.5;
+    white-space:pre-wrap;
+  }
+  .row.assistant .bubble{
+    background:var(--surface-alt);
+    border:1px solid var(--border);
+    border-top-left-radius:4px;
+  }
+  .row.user .bubble{
+    background:linear-gradient(160deg, var(--teal), #2f6f6a);
+    border-top-right-radius:4px;
+    color:#EAF6F4;
+  }
+  .stamp{
+    position:absolute;
+    top:-10px;
+    font-family:'JetBrains Mono', monospace;
+    font-size:9.5px;
+    letter-spacing:0.6px;
+    padding:2px 6px;
+    border-radius:100px;
+    border:1px solid var(--brass-dim);
+    color:var(--brass);
+    background:var(--ink);
+    text-transform:uppercase;
+    animation:stampIn .28s ease;
+  }
+  .row.assistant .stamp{ left:-8px; }
+  .row.user .stamp{ right:-8px; border-color:rgba(234,246,244,0.4); color:#EAF6F4; }
+  @keyframes stampIn{
+    from{ transform:scale(1.4) rotate(-8deg); opacity:0; }
+    to{ transform:scale(1) rotate(-6deg); opacity:1; }
+  }
+
+  .composer{
+    display:flex;
+    gap:10px;
+    padding:18px 28px 26px;
+    border-top:1px solid var(--border);
+  }
+  .composer input{
+    flex:1;
+    background:var(--surface-alt);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    color:var(--text);
+    font-size:14px;
+    font-family:'Noto Sans', sans-serif;
+  }
+  .composer input:focus{ outline:none; border-color:var(--brass); }
+  .composer button{
+    background:var(--brass);
+    color:#1a1710;
+    border:none;
+    border-radius:10px;
+    padding:0 20px;
+    font-weight:600;
+    font-family:'JetBrains Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:0.4px;
+    cursor:pointer;
+    transition:filter .15s ease;
+  }
+  .composer button:hover{ filter:brightness(1.1); }
+  .composer button:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .hint{
+    padding:0 28px 18px;
+    color:var(--muted);
+    font-size:12px;
+  }
+  .typing{ color:var(--muted); font-size:13px; font-style:italic; padding-left:4px; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>LinguaDesk</h1>
+      <p>one desk, every language — write in whichever one you think in</p>
+    </header>
+
+    <div class="desks">
+      <button class="desk-btn active" data-domain="general">GENERAL</button>
+      <button class="desk-btn" data-domain="college">COLLEGE DESK</button>
+      <button class="desk-btn" data-domain="support">SUPPORT DESK</button>
+    </div>
+
+    <div class="chat" id="chat"></div>
+    <div class="typing" id="typing" style="display:none; padding-left:28px;">LinguaDesk is writing back…</div>
+
+    <div class="composer">
+      <input id="input" type="text" placeholder="Type in any language — हिंदी, English, Español, العربية…" autocomplete="off" />
+      <button id="send">SEND</button>
+    </div>
+    <div class="hint">Every message is tagged with the language LinguaDesk detected, like a stamp on a letter.</div>
+  </div>
+
+<script>
+  const chatEl = document.getElementById('chat');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+  const typingEl = document.getElementById('typing');
+  const deskBtns = document.querySelectorAll('.desk-btn');
+
+  let domain = 'general';
+  let sessionId = sessionStorage.getItem('linguadesk_session') || null;
+
+  deskBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      deskBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      domain = btn.dataset.domain;
+    });
+  });
+
+  function addBubble(role, text, languageName){
+    const row = document.createElement('div');
+    row.className = 'row ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    if(languageName){
+      const stamp = document.createElement('div');
+      stamp.className = 'stamp';
+      stamp.textContent = languageName;
+      bubble.appendChild(stamp);
+    }
+    row.appendChild(bubble);
+    chatEl.appendChild(row);
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  async function sendMessage(){
+    const message = inputEl.value.trim();
+    if(!message) return;
+    addBubble('user', message, null);
+    inputEl.value = '';
+    sendBtn.disabled = true;
+    typingEl.style.display = 'block';
+
+    try{
+      const res = await fetch('/api/chat', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ sessionId, domain, message })
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || 'request failed');
+
+      sessionId = data.sessionId;
+      sessionStorage.setItem('linguadesk_session', sessionId);
+      addBubble('assistant', data.reply, data.languageName);
+    }catch(err){
+      addBubble('assistant', 'Sorry, something went wrong reaching the model: ' + err.message, null);
+    }finally{
+      sendBtn.disabled = false;
+      typingEl.style.display = 'none';
+      inputEl.focus();
+    }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', (e) => { if(e.key === 'Enter') sendMessage(); });
+
+  addBubble('assistant', "Hello! Write to me in any language and I'll reply in the same one. / नमस्ते! किसी भी भाषा में लिखें।", 'English');
+</script>
+</body>
+</html>
